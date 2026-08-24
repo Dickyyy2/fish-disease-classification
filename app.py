@@ -7,6 +7,7 @@ import zipfile
 import json
 import tempfile
 import shutil
+from huggingface_hub import hf_hub_download
 
 # --- BACA FILE .env SECARA MANUAL JIKA ADA ---
 def load_env_file():
@@ -221,6 +222,36 @@ st.markdown("""
 # --- KONSTANTA PATH MODEL & DAFTAR KELAS ---
 MODEL_PATH = "model.keras"
 
+def get_config_value(name, default=""):
+    value = os.environ.get(name, "").strip()
+    if value:
+        return value
+    try:
+        return str(st.secrets.get(name, default)).strip()
+    except Exception:
+        return default
+
+HF_MODEL_REPO = get_config_value("HF_MODEL_REPO")
+HF_MODEL_FILENAME = get_config_value("HF_MODEL_FILENAME", MODEL_PATH)
+
+def get_hf_token():
+    return get_config_value("HF_TOKEN")
+
+def resolve_model_path():
+    if os.path.exists(MODEL_PATH):
+        return MODEL_PATH
+    if not HF_MODEL_REPO:
+        return MODEL_PATH
+    try:
+        return hf_hub_download(
+            repo_id=HF_MODEL_REPO,
+            filename=HF_MODEL_FILENAME,
+            token=get_hf_token() or None,
+        )
+    except Exception as e:
+        st.error(f"Gagal mengunduh model dari Hugging Face: {e}")
+        return MODEL_PATH
+
 CLASS_NAMES = [
     "Bacterial Red disease",
     "Bacterial diseases - Aeromoniasis",
@@ -356,7 +387,8 @@ with st.sidebar:
     st.caption("• **LLM Engine:** Gemini 3.6 Flash")
 
 # Memuat model Keras
-model = load_fish_model(MODEL_PATH)
+resolved_model_path = resolve_model_path()
+model = load_fish_model(resolved_model_path)
 
 # --- HERO BANNER HEADER ---
 st.markdown("""
